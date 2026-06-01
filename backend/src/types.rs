@@ -7,6 +7,7 @@ pub struct ChainConfig {
     pub id: u64,
     pub name: String,
     pub rpc_url: String,
+    pub rpc_urls: Vec<String>,
     pub native_currency: String,
     pub explorer_url: String,
 }
@@ -347,4 +348,279 @@ pub struct HealthResponse {
     pub status: String,
     pub chains_connected: Vec<String>,
     pub uptime_secs: u64,
+}
+
+// ─── Net Profit & Cost Breakdown ─────────────────────
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CostBreakdown {
+    pub gas_estimated_usd: f64,
+    pub flash_loan_fee_usd: f64,
+    pub slippage_estimated_usd: f64,
+    pub bridge_fee_usd: Option<f64>,
+    pub velora_fee_usd: f64,
+    pub total_cost_usd: f64,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct NetProfitBreakdown {
+    pub gross_profit_usd: f64,
+    pub costs: CostBreakdown,
+    pub net_profit_usd: f64,
+    pub net_profit_pct: f64,
+    pub roi_pct: f64,
+    pub is_profitable: bool,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub enum ArbitrageType {
+    Simple,       // Buy X on DEX A, sell on DEX B
+    Triangular,   // A → B → C → A
+    CrossChain,   // Bridge between chains
+    Mint,         // Mint DAI cheaper than market
+    JitLiquidity, // JIT liquidity / MEV
+}
+
+impl ArbitrageType {
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            ArbitrageType::Simple => "Simple",
+            ArbitrageType::Triangular => "Triangular",
+            ArbitrageType::CrossChain => "Cross-Chain",
+            ArbitrageType::Mint => "Mint",
+            ArbitrageType::JitLiquidity => "JIT / MEV",
+        }
+    }
+    pub fn description(&self) -> &'static str {
+        match self {
+            ArbitrageType::Simple => "Buy low on one DEX, sell high on another DEX",
+            ArbitrageType::Triangular => "Cycle through 3 tokens exploiting price inconsistencies",
+            ArbitrageType::CrossChain => "Buy on chain A, bridge to chain B, sell at higher price",
+            ArbitrageType::Mint => "Mint synthetic asset below market price",
+            ArbitrageType::JitLiquidity => "Provide just-in-time liquidity to capture LP fees",
+        }
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct FlashLoanRecommendation {
+    pub source: FlashLoanSource,
+    pub fee_pct: f64,
+    pub fee_usd: f64,
+    pub reason: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct RecommendedFlashLoan {
+    pub primary: FlashLoanRecommendation,
+    pub alternatives: Vec<FlashLoanRecommendation>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct OpportunityDetail {
+    pub id: String,
+    pub token: String,
+    pub token_address: String,
+    pub arbitrage_type: ArbitrageType,
+    pub chain_name: String,
+    pub chain_id: u64,
+    pub buy_dex: Option<String>,
+    pub sell_dex: Option<String>,
+    pub buy_price: f64,
+    pub sell_price: f64,
+    pub spread_pct: f64,
+    pub profit_breakdown: NetProfitBreakdown,
+    pub flash_loan_recommendation: Option<RecommendedFlashLoan>,
+    pub execution_steps: Vec<String>,
+    pub confidence_score: f64, // 0.0 - 1.0
+    pub liquidity_usd: f64,
+    pub timestamp: u64,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ComprehensiveScanResponse {
+    pub opportunities: Vec<OpportunityDetail>,
+    pub total_opportunities: usize,
+    pub profitable_count: usize,
+    pub total_net_profit_usd: f64,
+    pub total_gas_estimated_usd: f64,
+    pub scan_time_ms: u64,
+    pub tokens_scanned: Vec<String>,
+    pub chains_scanned: Vec<String>,
+    pub dexes_scanned: Vec<String>,
+}
+
+// ─── Bot Config ──────────────────────────────────────
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct BotConfig {
+    pub mode: BotMode,
+    pub min_net_profit_usd: f64,
+    pub max_gas_price_gwei: Option<f64>,
+    pub enabled_strategies: Vec<ArbitrageType>,
+    pub flash_loan_sources: Vec<FlashLoanSource>,
+    pub gas_strategy: GasStrategy,
+    pub max_slippage_pct: f64,
+    pub auto_restart: bool,
+    pub llm_advisor: bool,
+    pub llm_config: Option<LLMConfig>,
+    pub scan_interval_secs: u64,
+    pub max_concurrent_tx: u32,
+    pub chains_enabled: Vec<u64>,
+    pub dexes_enabled: Vec<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub enum BotMode {
+    Manual,    // Bot finds opportunities, user reviews & approves
+    Auto,      // Bot executes automatically
+    SemiAuto,  // Bot auto-executes below threshold, asks above
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct BotStatus {
+    pub running: bool,
+    pub config: BotConfig,
+    pub total_trades: u64,
+    pub successful_trades: u64,
+    pub failed_trades: u64,
+    pub total_profit_usd: f64,
+    pub uptime_secs: u64,
+    pub current_opportunity: Option<OpportunityDetail>,
+    pub last_execution: Option<u64>,
+    pub logs: Vec<BotLogEntry>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct BotLogEntry {
+    pub timestamp: u64,
+    pub level: String,
+    pub message: String,
+    pub opportunity_id: Option<String>,
+    pub profit_usd: Option<f64>,
+}
+
+// ─── LLM Integration ─────────────────────────────────
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct LLMConfig {
+    pub provider: LLMProvider,
+    pub api_key: String,
+    pub model: String,
+    pub temperature: f64,
+    pub max_tokens: u32,
+    pub system_prompt: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub enum LLMProvider {
+    OpenAI,
+    Anthropic,
+    Groq,
+    Ollama,
+    DeepSeek,
+    Custom,
+}
+
+impl LLMProvider {
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            LLMProvider::OpenAI => "OpenAI",
+            LLMProvider::Anthropic => "Anthropic",
+            LLMProvider::Groq => "Groq",
+            LLMProvider::Ollama => "Ollama (Local)",
+            LLMProvider::DeepSeek => "DeepSeek",
+            LLMProvider::Custom => "Custom",
+        }
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct LLMAdviceRequest {
+    pub opportunity: OpportunityDetail,
+    pub market_context: String,
+    pub user_question: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct LLMAdviceResponse {
+    pub advice: String,
+    pub confidence: String,
+    pub recommend_execute: bool,
+    pub reasoning: Vec<String>,
+    pub risk_factors: Vec<String>,
+}
+
+// ─── Liquidity Data ──────────────────────────────────
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct LiquidityDataPoint {
+    pub chain_id: u64,
+    pub chain_name: String,
+    pub dex_name: String,
+    pub token: String,
+    pub token_address: String,
+    pub liquidity_usd: f64,
+    pub price_usd: f64,
+    pub volume_24h_usd: f64,
+    pub pool_address: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct LiquidityMapResponse {
+    pub total_liquidity_usd: f64,
+    pub by_chain: Vec<LiquidityChainSummary>,
+    pub by_dex: Vec<LiquidityDexSummary>,
+    pub data_points: Vec<LiquidityDataPoint>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct LiquidityChainSummary {
+    pub chain_id: u64,
+    pub chain_name: String,
+    pub total_liquidity_usd: f64,
+    pub dex_count: usize,
+    pub token_count: usize,
+    pub percentage: f64,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct LiquidityDexSummary {
+    pub dex_name: String,
+    pub chain_id: u64,
+    pub total_liquidity_usd: f64,
+    pub percentage: f64,
+}
+
+// ─── Bubble Chart ────────────────────────────────────
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct BubbleData {
+    pub token: String,
+    pub symbol: String,
+    pub price_usd: f64,
+    pub liquidity_usd: f64,
+    pub market_cap_usd: f64,
+    pub chain_name: String,
+    pub chain_id: u64,
+    pub has_opportunity: bool,
+    pub opportunity_types: Vec<ArbitrageType>,
+    pub best_spread_pct: f64,
+    pub volume_24h_usd: f64,
+    pub price_change_24h_pct: f64,
+    pub dexes_available: Vec<String>,
+    pub bubble_size: f64, // calculated: sqrt(liquidity) normalized
+}
+
+// ─── Response wrapper for all frontend data ──────────
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct DashboardData {
+    pub bubbles: Vec<BubbleData>,
+    pub liquidity_map: LiquidityMapResponse,
+    pub opportunities: Vec<OpportunityDetail>,
+    pub bot_status: Option<BotStatus>,
+    pub scan_timestamp: u64,
+    pub total_profit_24h_usd: f64,
+    pub total_opportunities_found: usize,
 }

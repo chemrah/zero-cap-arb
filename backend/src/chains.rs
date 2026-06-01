@@ -3,6 +3,35 @@ use std::sync::OnceLock;
 
 pub static CHAINS: OnceLock<Vec<ChainConfig>> = OnceLock::new();
 
+/// Read an env var and split by comma → multiple RPC URLs
+/// If the var is `KEY` it reads `KEY`, `KEY_1`, `KEY_2`, ...
+/// Example:
+///   ETH_RPC_URL=https://eth-mainnet.g.alchemy.com/v2/xxx
+///   ETH_RPC_URL_1=https://mainnet.infura.io/v3/yyy
+/// Or all in one:
+///   ETH_RPC_URL="https://eth-mainnet.alchemy.io/xxx,https://mainnet.infura.io/yyy"
+fn read_rpc_urls(env_key: &str, default: &str) -> Vec<String> {
+    let primary = std::env::var(env_key).unwrap_or_else(|_| default.to_string());
+
+    // Try splitting by comma
+    let parts: Vec<&str> = primary.split(',').map(|s| s.trim()).filter(|s| !s.is_empty()).collect();
+    if parts.len() > 1 {
+        return parts.into_iter().map(|s| s.to_string()).collect();
+    }
+
+    // Try numbered fallbacks: KEY_1, KEY_2, ...
+    let mut urls = vec![primary];
+    for i in 1..=3 {
+        let fallback_key = format!("{}_{}", env_key, i);
+        match std::env::var(&fallback_key) {
+            Ok(url) => urls.push(url),
+            Err(_) => break,
+        }
+    }
+
+    urls
+}
+
 pub fn get_chains() -> &'static Vec<ChainConfig> {
     CHAINS.get_or_init(|| {
         vec![
@@ -11,6 +40,7 @@ pub fn get_chains() -> &'static Vec<ChainConfig> {
                 name: "Ethereum".to_string(),
                 rpc_url: std::env::var("ETH_RPC_URL")
                     .unwrap_or_else(|_| "https://eth.merkle.io".to_string()),
+                rpc_urls: read_rpc_urls("ETH_RPC_URL", "https://eth.merkle.io"),
                 native_currency: "ETH".to_string(),
                 explorer_url: "https://etherscan.io".to_string(),
             },
@@ -19,6 +49,7 @@ pub fn get_chains() -> &'static Vec<ChainConfig> {
                 name: "Arbitrum".to_string(),
                 rpc_url: std::env::var("ARB_RPC_URL")
                     .unwrap_or_else(|_| "https://arb1.arbitrum.io/rpc".to_string()),
+                rpc_urls: read_rpc_urls("ARB_RPC_URL", "https://arb1.arbitrum.io/rpc"),
                 native_currency: "ETH".to_string(),
                 explorer_url: "https://arbiscan.io".to_string(),
             },
@@ -27,6 +58,7 @@ pub fn get_chains() -> &'static Vec<ChainConfig> {
                 name: "Optimism".to_string(),
                 rpc_url: std::env::var("OP_RPC_URL")
                     .unwrap_or_else(|_| "https://mainnet.optimism.io".to_string()),
+                rpc_urls: read_rpc_urls("OP_RPC_URL", "https://mainnet.optimism.io"),
                 native_currency: "ETH".to_string(),
                 explorer_url: "https://optimistic.etherscan.io".to_string(),
             },
@@ -35,6 +67,7 @@ pub fn get_chains() -> &'static Vec<ChainConfig> {
                 name: "Polygon".to_string(),
                 rpc_url: std::env::var("POLY_RPC_URL")
                     .unwrap_or_else(|_| "https://polygon-rpc.com".to_string()),
+                rpc_urls: read_rpc_urls("POLY_RPC_URL", "https://polygon-rpc.com"),
                 native_currency: "MATIC".to_string(),
                 explorer_url: "https://polygonscan.com".to_string(),
             },
@@ -43,6 +76,7 @@ pub fn get_chains() -> &'static Vec<ChainConfig> {
                 name: "BSC".to_string(),
                 rpc_url: std::env::var("BSC_RPC_URL")
                     .unwrap_or_else(|_| "https://bsc-dataseed.binance.org".to_string()),
+                rpc_urls: read_rpc_urls("BSC_RPC_URL", "https://bsc-dataseed.binance.org"),
                 native_currency: "BNB".to_string(),
                 explorer_url: "https://bscscan.com".to_string(),
             },
@@ -51,6 +85,7 @@ pub fn get_chains() -> &'static Vec<ChainConfig> {
                 name: "Avalanche".to_string(),
                 rpc_url: std::env::var("AVAX_RPC_URL")
                     .unwrap_or_else(|_| "https://api.avax.network/ext/bc/C/rpc".to_string()),
+                rpc_urls: read_rpc_urls("AVAX_RPC_URL", "https://api.avax.network/ext/bc/C/rpc"),
                 native_currency: "AVAX".to_string(),
                 explorer_url: "https://snowtrace.io".to_string(),
             },

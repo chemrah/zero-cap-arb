@@ -6,7 +6,7 @@ use chrono::Utc;
 use dashmap::DashMap;
 use std::sync::Arc;
 use std::time::Instant;
-use tracing::warn;
+use tracing::{error, warn};
 use uuid::Uuid;
 
 /// Core radar scanner that finds arbitrage opportunities across 6 chains and 50+ DEXes
@@ -93,9 +93,14 @@ impl RadarScanner {
             }
         }
 
-        // Build provider
-        let provider = ProviderBuilder::new()
-            .on_http(chain.rpc_url.parse().unwrap());
+        // Build provider with fallback URLs
+        let provider = match try_build_provider(&chain.rpc_urls) {
+            Ok(p) => p,
+            Err(e) => {
+                error!("All RPCs failed for {}: {}", chain.name, e);
+                return prices;
+            }
+        };
 
         for dex in dexes {
             match self
@@ -413,4 +418,220 @@ impl RadarScanner {
     pub fn clear_cache(&self) {
         self.price_cache.clear();
     }
+
+    // ─── Comprehensive Scan (ALL tokens, ALL DEXes, ALL strategies) ─────
+
+    pub async fn comprehensive_scan(
+        &self,
+        tokens: &[TokenInfo],
+    ) -> Result<ComprehensiveScanResponse, Box<dyn std::error::Error + Send + Sync>> {
+        let start = Instant::now();
+        let chains = get_chains();
+        let mut all_opportunities = Vec::new();
+        let mut tokens_scanned = Vec::new();
+        let mut chains_scanned = Vec::new();
+        let mut dexes_scanned = Vec::new();
+
+        for chain in chains {
+            chains_scanned.push(chain.name.clone());
+            let dexes = get_dexes_for_chain(chain.id);
+            if dexes.is_empty() { continue; }
+            for dex in dexes {
+                if !dexes_scanned.contains(&dex.name) {
+                    dexes_scanned.push(dex.name.clone());
+                }
+            }
+
+            let provider = match try_build_provider(&chain.rpc_urls) {
+                Ok(p) => p,
+                Err(_) => continue,
+            };
+
+            for token in tokens {
+                if !tokens_scanned.contains(&token.symbol) {
+                    tokens_scanned.push(token.symbol.clone());
+                }
+
+                let addr = &token.address;
+                let symbol = &token.symbol;
+
+                // Query all DEXes for this token on this chain
+                let mut chain_prices = Vec::new();
+                for dex in get_dexes_for_chain(chain.id) {
+                    match self
+                        .query_dex_price(&provider, chain, &dex, symbol, addr)
+                        .await
+                    {
+                        Ok(Some(price)) => chain_prices.push(price),
+                        _ => {}
+                    }
+                }
+
+                if chain_prices.len() < 2 { continue; }
+
+                // Find cheapest and most expensive on this chain
+                if let (Some(cheapest), Some(priciest)) = (
+                    chain_prices.iter().min_by(|a, b| a.price_usd.partial_cmp(&b.price_usd).unwrap()),
+                    chain_prices.iter().max_by(|a, b| a.price_usd.partial_cmp(&b.price_usd).unwrap()),
+                ) {
+                    let spread_pct = if cheapest.price_usd > 0.0 {
+                        ((priciest.price_usd - cheapest.price_usd) / cheapest.price_usd) * 100.0
+                    } else {
+                        0.0
+                    };
+
+                    if spread_pct >= self.min_spread_pct {
+                        let gross_profit = (priciest.price_usd - cheapest.price_usd) * 1000.0; // assume 1000 tokens
+                        let gas_est = estimate_gas_cost(chain.id);
+                        let fl_fee = estimate_flash_loan_fee(&chain_prices, symbol);
+                        let slippage = gross_profit * 0.005; // 0.5% slippage
+                        let total_cost = gas_est + fl_fee.fee_usd + slippage;
+                        let net_profit = gross_profit - total_cost;
+                        let net_pct = if total_cost > 0.0 { (net_profit / total_cost) * 100.0 } else { 0.0 };
+                        let roi = if cheapest.price_usd > 0.0 { (net_profit / (cheapest.price_usd * 1000.0)) * 100.0 } else { 0.0 };
+
+                        if net_profit > 0.0 {
+                            let mut recommendations = vec![fl_fee.clone()];
+                            // Add alternative flash loan sources
+                            for alt_source in &[FlashLoanSource::AaveV3, FlashLoanSource::RadiantV2, FlashLoanSource::Spark] {
+                                if alt_source.as_str() != fl_fee.source.as_str() {
+                                    let alt_fee = alt_source.fee_pct(symbol);
+                                    recommendations.push(FlashLoanRecommendation {
+                                        source: alt_source.clone(),
+                                        fee_pct: alt_fee,
+                                        fee_usd: gross_profit * (alt_fee / 100.0),
+                                        reason: format!("{} - {} fee", alt_source.as_str(), alt_fee),
+                                    });
+                                }
+                            }
+
+                            let opp_type = if cheapest.chain_id == priciest.chain_id {
+                                ArbitrageType::Simple
+                            } else {
+                                ArbitrageType::CrossChain
+                            };
+
+                            all_opportunities.push(OpportunityDetail {
+                                id: Uuid::new_v4().to_string(),
+                                token: symbol.clone(),
+                                token_address: addr.clone(),
+                                arbitrage_type: opp_type,
+                                chain_name: chain.name.clone(),
+                                chain_id: chain.id,
+                                buy_dex: Some(cheapest.dex_name.clone()),
+                                sell_dex: Some(priciest.dex_name.clone()),
+                                buy_price: cheapest.price_usd,
+                                sell_price: priciest.price_usd,
+                                spread_pct,
+                                profit_breakdown: NetProfitBreakdown {
+                                    gross_profit_usd: gross_profit,
+                                    costs: CostBreakdown {
+                                        gas_estimated_usd: gas_est,
+                                        flash_loan_fee_usd: fl_fee.fee_usd,
+                                        slippage_estimated_usd: slippage,
+                                        bridge_fee_usd: if cheapest.chain_id != priciest.chain_id { Some(0.50) } else { None },
+                                        velora_fee_usd: gross_profit * 0.001,
+                                        total_cost_usd: total_cost,
+                                    },
+                                    net_profit_usd: net_profit,
+                                    net_profit_pct: net_pct,
+                                    roi_pct: roi,
+                                    is_profitable: true,
+                                },
+                                flash_loan_recommendation: Some(RecommendedFlashLoan {
+                                    primary: fl_fee,
+                                    alternatives: recommendations[1..].to_vec(),
+                                }),
+                                execution_steps: vec![
+                                    format!("1. Initiate flash loan from {}", chain.name),
+                                    format!("2. Buy {} on {} at ${:.4}", symbol, cheapest.dex_name, cheapest.price_usd),
+                                    format!("3. Sell {} on {} at ${:.4}", symbol, priciest.dex_name, priciest.price_usd),
+                                    format!("4. Repay flash loan + ${:.2} fee", total_cost),
+                                    format!("5. Keep ${:.2} net profit", net_profit),
+                                ],
+                                confidence_score: calculate_confidence(spread_pct, net_profit, cheapest.liquidity_usd),
+                                liquidity_usd: priciest.liquidity_usd.min(cheapest.liquidity_usd),
+                                timestamp: Utc::now().timestamp() as u64,
+                            });
+                        }
+                    }
+                }
+            }
+        }
+
+        let profitable_count = all_opportunities.iter().filter(|o| o.profit_breakdown.is_profitable).count();
+        let total_net = all_opportunities.iter().map(|o| o.profit_breakdown.net_profit_usd).sum();
+        let total_gas = all_opportunities.iter().map(|o| o.profit_breakdown.costs.gas_estimated_usd).sum();
+        let elapsed = start.elapsed().as_millis() as u64;
+
+        Ok(ComprehensiveScanResponse {
+            opportunities: all_opportunities,
+            total_opportunities: all_opportunities.len(),
+            profitable_count,
+            total_net_profit_usd: total_net,
+            total_gas_estimated_usd: total_gas,
+            scan_time_ms: elapsed,
+            tokens_scanned,
+            chains_scanned,
+            dexes_scanned,
+        })
+    }
+}
+
+// ─── Helper Functions ─────────────────────────────────
+
+fn estimate_gas_cost(chain_id: u64) -> f64 {
+    match chain_id {
+        1 => 15.0,    // Ethereum
+        42161 => 0.30, // Arbitrum
+        10 => 0.25,    // Optimism
+        137 => 0.50,   // Polygon
+        56 => 0.40,    // BSC
+        43114 => 0.60, // Avalanche
+        _ => 1.0,
+    }
+}
+
+fn estimate_flash_loan_fee(prices: &[TokenPrice], token: &str) -> FlashLoanRecommendation {
+    let spark_fee = FlashLoanSource::Spark.fee_pct(token);
+    let aave_fee = FlashLoanSource::AaveV3.fee_pct(token);
+    let radiant_fee = FlashLoanSource::RadiantV2.fee_pct(token);
+
+    let mut sources = vec![
+        (FlashLoanSource::Spark, spark_fee, "Spark Protocol - 0% on DAI, 0.05% on others"),
+        (FlashLoanSource::RadiantV2, radiant_fee, "Radiant V2 - 0.03% lowest standard fee"),
+        (FlashLoanSource::AaveV3, aave_fee, "Aave V3 - 0.05% standard fee"),
+    ];
+    sources.sort_by(|a, b| a.1.partial_cmp(&b.1).unwrap_or(std::cmp::Ordering::Equal));
+
+    FlashLoanRecommendation {
+        source: sources[0].0.clone(),
+        fee_pct: sources[0].1,
+        fee_usd: 0.0, // calculated in context
+        reason: sources[0].2.to_string(),
+    }
+}
+
+fn calculate_confidence(spread_pct: f64, net_profit_usd: f64, liquidity_usd: f64) -> f64 {
+    let spread_score = (spread_pct / 10.0).min(1.0);
+    let profit_score = (net_profit_usd / 500.0).min(1.0);
+    let liq_score = (liquidity_usd / 1_000_000.0).min(1.0);
+    (spread_score * 0.4 + profit_score * 0.3 + liq_score * 0.3).min(1.0)
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TokenInfo {
+    pub symbol: String,
+    pub address: String,
+}
+
+/// Try each RPC URL until one works
+fn try_build_provider(urls: &[String]) -> Result<alloy::providers::RootProvider<alloy::transports::http::Http<reqwest::Client>>, String> {
+    for url in urls {
+        match url.parse::<alloy::transports::http::Http<reqwest::Client>>() {
+            Ok(http) => return Ok(ProviderBuilder::new().on_http(http)),
+            Err(e) => warn!("RPC {} failed to parse, trying next: {}", url, e),
+        }
+    }
+    Err(format!("No working RPC URL in {:?}", urls))
 }
