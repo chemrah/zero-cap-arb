@@ -137,35 +137,31 @@ export interface AllOpportunitiesResponse {
   scan_time_ms: number;
 }
 
-// ─── ParaSwap ─────────────────────────────────────────
+// ─── Velora Market API (ex-ParaSwap) ──────────────────
 
-export interface ParaSwapRoute {
+export interface VeloraRoute {
   src_token: string;
   dest_token: string;
   src_amount: string;
   dest_amount: string;
   percentage: number;
-  swaps?: ParaSwapSwap[];
-}
-
-export interface ParaSwapSwap {
   exchange: string;
-  src_amount: string;
-  dest_amount: string;
-  percent: number;
 }
 
-export interface ParaSwapPriceResponse {
+export interface VeloraPriceResponse {
   src_token: string;
   dest_token: string;
   src_amount: string;
   dest_amount: string;
   price_impact: number;
-  routes: ParaSwapRoute[];
+  routes: VeloraRoute[];
   gas_cost_usd: number;
+  contract_address: string;
+  token_transfer_proxy: string;
+  version: string;
 }
 
-export interface ParaSwapTransactionResponse {
+export interface VeloraTxResponse {
   from: string;
   to: string;
   value: string;
@@ -228,22 +224,41 @@ export const api = {
       body: JSON.stringify({ token, token_address: tokenAddress }),
     }),
 
-  getParaSwapPrice: (params: {
+  getVeloraPrice: (params: {
     chain_id: number; src_token: string; dest_token: string;
     src_decimals: number; dest_decimals: number;
     amount: string; side: string;
   }) =>
-    fetchApi<ParaSwapPriceResponse>('/api/paraswap/price', {
+    fetchApi<VeloraPriceResponse>('/api/velora/price', {
       method: 'POST', body: JSON.stringify(params),
     }),
 
-  buildParaSwapTx: (params: {
+  getVeloraSwap: (params: {
+    chain_id: number; src_token: string; dest_token: string;
+    src_decimals: number; dest_decimals: number;
+    amount: string; side: string;
+    user_address?: string; slippage?: number;
+  }) =>
+    fetchApi<Record<string, unknown>>('/api/velora/swap', {
+      method: 'POST', body: JSON.stringify(params),
+    }),
+
+  buildVeloraTx: (params: {
     chain_id: number; src_token: string; dest_token: string;
     src_decimals: number; dest_decimals: number;
     src_amount: string; dest_amount: string;
     slippage: number; user_address: string;
+    price_route?: Record<string, unknown>;
   }) =>
-    fetchApi<ParaSwapTransactionResponse>('/api/paraswap/build-tx', {
+    fetchApi<VeloraTxResponse>('/api/velora/build-tx', {
+      method: 'POST', body: JSON.stringify(params),
+    }),
+
+  submitDeltaOrder: (params: {
+    chain_id: number; src_token: string; dest_token: string;
+    amount: string; user_address: string;
+  }) =>
+    fetchApi<Record<string, unknown>>('/api/velora/delta', {
       method: 'POST', body: JSON.stringify(params),
     }),
 

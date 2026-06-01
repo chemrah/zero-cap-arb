@@ -3,7 +3,7 @@
 
 **Zero-Capital Arbitrage** is a next-generation DeFi arbitrage platform that lets users execute **flash-loan arbitrage**, **triangular arbitrage**, **cross-chain arbitrage**, **mint arbitrage**, and **JIT liquidity** — all with **zero upfront capital** and **zero upfront gas fees**.
 
-A real-time radar scans **55+ DEXes across 6 chains** (Ethereum, Arbitrum, Optimism, Polygon, BSC, Avalanche) to surface every price difference, then executes the optimal trade via **ParaSwap V5 split-routing**, funded by flash loans from **Aave V3 / Radiant V2 / Spark Protocol**, and submitted through **Flashbots / MEV-Share** private bundles or **ERC-4337 paymasters** (Pimlico / ZeroDev).
+A real-time radar scans **55+ DEXes across 6 chains** (Ethereum, Arbitrum, Optimism, Polygon, BSC, Avalanche) to surface every price difference, then executes the optimal trade via **Velora (ex-ParaSwap) V5 split-routing**, funded by flash loans from **Aave V3 / Radiant V2 / Spark Protocol**, and submitted through **Flashbots / MEV-Share** private bundles or **ERC-4337 paymasters** (Pimlico / ZeroDev).
 
 ---
 
@@ -42,10 +42,10 @@ A real-time radar scans **55+ DEXes across 6 chains** (Ethereum, Arbitrum, Optim
 | **Zero-Capital Arbitrage** | Execute trades funded by flash loans. Borrow from Aave V3 / Radiant V2 / Spark Protocol — repay from profit. |
 | **Zero-Upfront Gas** | Two gas strategies: Flashbots/MEV-Share (miner paid from profit, $0 if revert) or ERC-4337 paymasters (Pimlico/ZeroDev, gas paid in profit tokens). |
 | **55+ DEX Scanner** | Real-time price scanner across 55 DEXes on 6 chains (Ethereum, Arbitrum, Optimism, Polygon, BSC, Avalanche). |
-| **ParaSwap V5 Split Routing** | Visual pie chart showing how ParaSwap splits the trade across multiple DEXes for the best price. |
+| **Velora (ex-ParaSwap) V5 Split Routing** | Visual pie chart showing how Velora (ex-ParaSwap) splits the trade across multiple DEXes for the best price. |
 | **All Prices Matrix** | View every single DEX price in a sortable, filterable table with chain summaries. |
 | **6 Arbitrage Strategies** | Flash Loan Arbitrage, Direct Swap, Mint Arbitrage, Triangular Arbitrage, Cross-Chain Arbitrage, JIT Liquidity / MEV. |
-| **Visual Execution Flow** | Graphical route display: FlashLoan → Buy DEX → ParaSwap Split → Sell DEX → Profit → Repayment. |
+| **Visual Execution Flow** | Graphical route display: FlashLoan → Buy DEX → Velora (ex-ParaSwap) Split → Sell DEX → Profit → Repayment. |
 | **RTL / Arabic Support** | Full Arabic interface with RTL layout toggle. |
 | **Dark Glassmorphism UI** | Premium dark mode UI with glassmorphism cards, neo-glow effects, and real-time radar animations. |
 
@@ -67,7 +67,7 @@ A real-time radar scans **55+ DEXes across 6 chains** (Ethereum, Arbitrum, Optim
 ┌──────────────────────────▼──────────────────────────────────┐
 │                    Rust Backend (Axum)                       │
 │  ┌────────────────┐  ┌────────────────┐  ┌──────────────┐   │
-│  │ Radar Scanner  │  │ ParaSwap V5   │  │ WebSocket    │   │
+│  │ Radar Scanner  │  │ Velora (ex-ParaSwap) V5   │  │ WebSocket    │   │
 │  │ (6 chains      │  │ Client (split │  │ Hub (real-   │   │
 │  │  × 55 DEXes)   │  │  routing API) │  │ time scans)  │   │
 │  └────────────────┘  └────────────────┘  └──────────────┘   │
@@ -84,7 +84,7 @@ A real-time radar scans **55+ DEXes across 6 chains** (Ethereum, Arbitrum, Optim
 │  │  ├── Aave V3 flashLoanSimple()                       │    │
 │  │  ├── Radiant V2 flashLoan()                          │    │
 │  │  ├── Spark Protocol flashLoanSimple()                │    │
-│  │  ├── ParaSwap V8 Augustus call()                     │    │
+│  │  ├── Velora (ex-ParaSwap) V8 Augustus call()                     │    │
 │  │  ├── Profit validation + safe revert                 │    │
 │  │  └── Flashbots block.coinbase.transfer               │    │
 │  └──────────────────────────────────────────────────────┘    │
@@ -100,7 +100,7 @@ A real-time radar scans **55+ DEXes across 6 chains** (Ethereum, Arbitrum, Optim
 | **Backend** | Rust, Axum, alloy-rs, tokio-tungstenite, serde |
 | **Smart Contracts** | Solidity 0.8.20, Foundry (forge, cast, anvil) |
 | **Flash Loans** | Aave V3, Radiant V2, Spark Protocol |
-| **DEX Aggregation** | ParaSwap V5 API (split routing) |
+| **DEX Aggregation** | Velora (ex-ParaSwap) V5 API (split routing) |
 | **Gas Strategies** | Flashbots MEV-Share, Pimlico (ERC-4337), ZeroDev (ERC-4337) |
 
 ### 🔄 How It Works
@@ -118,7 +118,7 @@ A real-time radar scans **55+ DEXes across 6 chains** (Ethereum, Arbitrum, Optim
                • Cross-Chain: bridge price differences
                • Mint: mint vs market price
                • JIT: mempool large-swap monitoring
-               • ParaSwap: optimal split-route pricing
+               • Velora (ex-ParaSwap): optimal split-route pricing
 
 3. EXECUTE   → User selects strategy + flash loan source + gas strategy:
                • Spark Protocol (0% fee on DAI) ← Priority
@@ -126,7 +126,7 @@ A real-time radar scans **55+ DEXes across 6 chains** (Ethereum, Arbitrum, Optim
                • Radiant V2 (0.03% fee)
                
 4. SETTLE    → Smart contract flow:
-               FlashLoan → ParaSwap.call(data) → Calculate Profit
+               FlashLoan → Velora (ex-ParaSwap).call(data) → Calculate Profit
                → Repay Loan + Fee → Send Profit to User
                → Pay Miner Tip (Flashbots) or Burn (ERC-4337)
                
@@ -228,8 +228,8 @@ Open **http://localhost:3000** in your browser.
 | `POST` | `/api/scan` | Scan simple arbitrage opportunities |
 | `POST` | `/api/all-prices` | Get all DEX prices (full matrix) |
 | `POST` | `/api/all-opportunities` | Scan all 6 arbitrage strategies |
-| `POST` | `/api/paraswap/price` | Get ParaSwap V5 price + split routes |
-| `POST` | `/api/paraswap/build-tx` | Build ParaSwap transaction calldata |
+| `POST` | `/api/paraswap/price` | Get Velora (ex-ParaSwap) V5 price + split routes |
+| `POST` | `/api/paraswap/build-tx` | Build Velora (ex-ParaSwap) transaction calldata |
 | `POST` | `/api/execute` | Execute basic arbitrage |
 | `POST` | `/api/execute/advanced` | Execute any strategy (flash loan / swap / mint / triangular / cross-chain / JIT) |
 | `GET` | `/api/chains` | List all supported chains |
@@ -241,7 +241,7 @@ Open **http://localhost:3000** in your browser.
 **`ZeroRiskArb.sol`** is the core execution contract:
 
 - **Flash Loan Integration**: Implements Aave V3 `IFlashLoanSimpleReceiver`, Radiant V2 multi-asset flash loans, and Spark Protocol flash loans (0% fee on DAI).
-- **ParaSwap Execution**: Calls the ParaSwap Augustus contract with exact calldata from the ParaSwap V5 API `buildTransaction()`.
+- **Velora (ex-ParaSwap) Execution**: Calls the Velora (ex-ParaSwap) Augustus contract with exact calldata from the Velora (ex-ParaSwap) V5 API `buildTransaction()`.
 - **Profit Safety**: `if (balance < loan + fee + minProfit) revert` — user loses $0 if trade fails.
 - **Flashbots Tips**: Swaps 10% of profit to WETH and sends via `block.coinbase.transfer`.
 - **Gas Optimized**: 1M optimizer runs, `via-ir` compilation, `uint8` packed enums.
@@ -266,7 +266,7 @@ forge test --match-path src/ZeroRiskArb.t.sol -vvv
 | **مراجحة بدون رأس مال** | تنفيذ الصفقات عبر القروض الفورية. اقترض من Aave V3 / Radiant V2 / Spark Protocol — وسدد من الأرباح. |
 | **غاز بدون دفعة مقدمة** | استراتيجيتان للغاز: Flashbots (يدفع المعدن من الربح، 0$ إذا فشلت) أو ERC-4337 (يدفع الغاز من أرباح الصفقة). |
 | **ماسح 55+ بورصة لامركزية** | مسح فوري لـ 55 بورصة لامركزية عبر 6 سلاسل (إيثريوم، أربيتروم، أوبتيمزم، بوليجون، بي إن بي، أفالانش). |
-| **تقسيم المسار عبر ParaSwap V5** | رسم بياني دائري يوضح كيفية توزيع ParaSwap الصفقة عبر عدة بورصات للحصول على أفضل سعر. |
+| **تقسيم المسار عبر Velora (ex-ParaSwap) V5** | رسم بياني دائري يوضح كيفية توزيع Velora (ex-ParaSwap) الصفقة عبر عدة بورصات للحصول على أفضل سعر. |
 | **مصفوفة الأسعار الكاملة** | عرض كل سعر من كل بورصة في جدول قابل للفرز والتصفية مع ملخص كل سلسلة. |
 | **6 استراتيجيات مراجحة** | المراجحة بالقروض الفورية، المبادلة المباشرة، المراجحة بالسك (الصك)، المراجحة المثلثية، المراجحة عبر السلاسل، السياقة الفورية / MEV. |
 | **واجهة عربية كاملة** | دعم كامل للغة العربية مع تخطيط RTL. |
@@ -289,7 +289,7 @@ forge test --match-path src/ZeroRiskArb.t.sol -vvv
 ┌────────────────────────────▼────────────────────────────────────┐
 │                   الخادم الخلفي (Rust + Axum)                    │
 │  ┌──────────────────┐  ┌──────────────────┐  ┌──────────────┐   │
-│  │ ماسح الرادار     │  │ عميل ParaSwap V5 │  │ خادم WebSocket│   │
+│  │ ماسح الرادار     │  │ عميل Velora (ex-ParaSwap) V5 │  │ خادم WebSocket│   │
 │  │ (6 سلاسل × 55   │  │ (تقسيم المسار)   │  │ (تحديث فوري)  │   │
 │  │ بورصة)          │  │                  │  │              │   │
 │  └──────────────────┘  └──────────────────┘  └──────────────┘   │
@@ -306,7 +306,7 @@ forge test --match-path src/ZeroRiskArb.t.sol -vvv
 │  │  ├── Aave V3 flashLoanSimple()                           │    │
 │  │  ├── Radiant V2 flashLoan()                              │    │
 │  │  ├── Spark Protocol flashLoanSimple()                     │    │
-│  │  ├── تنفيذ ParaSwap Augustus                              │    │
+│  │  ├── تنفيذ Velora (ex-ParaSwap) Augustus                              │    │
 │  │  ├── التحقق من الربح + الإلغاء الآمن                      │    │
 │  │  └── دفع عمولة المعدن عبر Flashbots                       │    │
 │  └──────────────────────────────────────────────────────────┘    │
@@ -322,7 +322,7 @@ forge test --match-path src/ZeroRiskArb.t.sol -vvv
 | **الخادم الخلفي** | Rust, Axum, alloy-rs, tokio-tungstenite, serde |
 | **العقود الذكية** | Solidity 0.8.20, Foundry (forge, cast, anvil) |
 | **القروض الفورية** | Aave V3, Radiant V2, Spark Protocol |
-| **تجميع البورصات** | ParaSwap V5 API (تقسيم المسار) |
+| **تجميع البورصات** | Velora (ex-ParaSwap) V5 API (تقسيم المسار) |
 | **استراتيجيات الغاز** | Flashbots MEV-Share, Pimlico (ERC-4337), ZeroDev (ERC-4337) |
 
 ### 🔄 طريقة العمل
@@ -344,7 +344,7 @@ forge test --match-path src/ZeroRiskArb.t.sol -vvv
 3. التنفيذ ← يختار المستخدم الاستراتيجية + مصدر القرض + استراتيجية الغاز
 
 4. التسوية ← تدفق العقد الذكي:
-            قرض فوري → تنفيذ ParaSwap → حساب الربح
+            قرض فوري → تنفيذ Velora (ex-ParaSwap) → حساب الربح
             → سداد القرض + الرسوم → إرسال الربح للمستخدم
             → دفع عمولة المعدن (Flashbots)
 
@@ -446,8 +446,8 @@ forge test
 | `POST` | `/api/scan` | مسح فرص المراجحة البسيطة |
 | `POST` | `/api/all-prices` | الحصول على كل أسعار البورصات (المصفوفة الكاملة) |
 | `POST` | `/api/all-opportunities` | مسح جميع استراتيجيات المراجحة الست |
-| `POST` | `/api/paraswap/price` | الحصول على سعر ParaSwap V5 + المسارات المقسمة |
-| `POST` | `/api/paraswap/build-tx` | بناء بيانات معاملة ParaSwap |
+| `POST` | `/api/paraswap/price` | الحصول على سعر Velora (ex-ParaSwap) V5 + المسارات المقسمة |
+| `POST` | `/api/paraswap/build-tx` | بناء بيانات معاملة Velora (ex-ParaSwap) |
 | `POST` | `/api/execute` | تنفيذ مراجحة أساسية |
 | `POST` | `/api/execute/advanced` | تنفيذ أي استراتيجية (قرض فوري / مبادلة / صك / مثلثي / عبر السلاسل / سيولة فورية) |
 | `GET` | `/api/chains` | عرض جميع السلاسل المدعومة |
@@ -459,7 +459,7 @@ forge test
 **`ZeroRiskArb.sol`** هو عقد التنفيذ الأساسي:
 
 - **القروض الفورية**: يدعم Aave V3 (`IFlashLoanSimpleReceiver`)، Radiant V2 (قروض متعددة الأصول)، وSpark Protocol (0% رسوم على DAI).
-- **تنفيذ ParaSwap**: يستدعي عقد ParaSwap Augustus مع بيانات المعاملة من API ParaSwap V5.
+- **تنفيذ Velora (ex-ParaSwap)**: يستدعي عقد Velora (ex-ParaSwap) Augustus مع بيانات المعاملة من API Velora (ex-ParaSwap) V5.
 - **سلامة الربح**: `if (balance < loan + fee + minProfit) revert` — المستخدم لا يخسر شيئًا إذا فشلت الصفقة.
 - **عمولة المعدن**: يحول 10% من الربح إلى WETH ويرسل عبر `block.coinbase.transfer`.
 - **محسن الغاز**: 1,000,000 دورة تحسين، تجميع `via-ir`.
@@ -480,7 +480,7 @@ MIT License — feel free to use, modify, and distribute.
 
 ## 🙏 Acknowledgments / الشكر
 
-- [ParaSwap](https://paraswap.io) — DEX aggregation API
+- [Velora (ex-ParaSwap)](https://paraswap.io) — DEX aggregation API
 - [Aave](https://aave.com) — Flash loan infrastructure
 - [Radiant](https://radiant.capital) — Cross-chain flash loans
 - [Spark Protocol](https://sparkprotocol.io) — 0% fee DAI flash loans

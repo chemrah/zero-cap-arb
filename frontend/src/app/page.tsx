@@ -112,7 +112,7 @@ export default function Home() {
                   rel="noopener noreferrer"
                   className="hover:text-gray-400 transition-colors"
                 >
-                  Powered by ParaSwap V5
+                  Powered by Velora (ex-ParaSwap)
                 </a>
                 <span>|</span>
                 <a

@@ -295,10 +295,10 @@ pub struct ExecuteResult {
     pub gas_cost_usd: Option<f64>,
 }
 
-// ─── ParaSwap ─────────────────────────────────────────
+// ─── Velora (formerly ParaSwap) ──────────────────────
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ParaSwapRoute {
+pub struct VeloraRoute {
     pub src_token: String,
     pub src_decimals: u8,
     pub dest_token: String,
@@ -306,38 +306,25 @@ pub struct ParaSwapRoute {
     pub src_amount: String,
     pub dest_amount: String,
     pub percentage: f64,
-    pub swaps: Vec<ParaSwapSwap>,
-    pub exchange_fees: Vec<ParaSwapFee>,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ParaSwapSwap {
     pub exchange: String,
-    pub src_amount: String,
-    pub dest_amount: String,
-    pub percent: f64,
-    pub data: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ParaSwapFee {
-    pub exchange: String,
-    pub fee_usd: f64,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ParaSwapPriceResponse {
+pub struct VeloraPriceResponse {
     pub src_token: String,
     pub dest_token: String,
     pub src_amount: String,
     pub dest_amount: String,
     pub price_impact: f64,
-    pub routes: Vec<ParaSwapRoute>,
+    pub routes: Vec<VeloraRoute>,
     pub gas_cost_usd: f64,
+    pub contract_address: String,
+    pub token_transfer_proxy: String,
+    pub version: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ParaSwapTransactionResponse {
+pub struct VeloraTxResponse {
     pub from: String,
     pub to: String,
     pub value: String,

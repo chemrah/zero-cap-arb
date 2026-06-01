@@ -5,17 +5,17 @@ import {IERC20} from "./interfaces/IERC20.sol";
 import {IAaveV3Pool, IFlashLoanSimpleReceiver} from "./interfaces/IAaveV3Pool.sol";
 import {IRadiantV2Pool} from "./interfaces/IRadiantV2Pool.sol";
 import {ISparkPool} from "./interfaces/ISparkPool.sol";
-import {IParaSwapAugustus} from "./interfaces/IParaSwapAugustus.sol";
+import {IVeloraAugustus} from "./interfaces/IVeloraAugustus.sol";
 
 /// @title ZeroRiskArb
-/// @notice Zero-capital arbitrage using flash loans + ParaSwap V5 split routing
+/// @notice Zero-capital arbitrage using flash loans + Velora Market API (ex-ParaSwap)
 /// @dev Users pay 0 upfront. Gas settled via Flashbots tips or ERC-4337 paymasters.
 ///      If the trade yields < minProfit the entire tx reverts — user loses nothing.
 contract ZeroRiskArb is IFlashLoanSimpleReceiver {
     // ─── Constants & Storage ───────────────────────────
 
     address public immutable owner;
-    address public immutable paraSwapAugustus;
+    address public immutable veloraAugustus;
     address public immutable tokenTransferProxy;
 
     address public aaveV3Pool;
@@ -60,8 +60,8 @@ contract ZeroRiskArb is IFlashLoanSimpleReceiver {
 
     constructor(address _augustus) {
         owner = msg.sender;
-        paraSwapAugustus = _augustus;
-        tokenTransferProxy = IParaSwapAugustus(_augustus).getTokenTransferProxy();
+        veloraAugustus = _augustus;
+        tokenTransferProxy = IVeloraAugustus(_augustus).getTokenTransferProxy();
     }
 
     // ─── Admin ─────────────────────────────────────────
@@ -79,7 +79,7 @@ contract ZeroRiskArb is IFlashLoanSimpleReceiver {
     /// @param asset  Token to borrow (e.g. DAI)
     /// @param amount  Exact borrow amount
     /// @param minProfit  Minimum profit; reverts if unmet
-    /// @param swapData  ParaSwap V5 calldata from buildTransaction
+    /// @param swapData  Velora Market API calldata (ex-ParaSwap /swap)
     /// @param flashbots  Whether to pay block.coinbase a tip
     function execute(
         uint8 source,
@@ -160,7 +160,7 @@ contract ZeroRiskArb is IFlashLoanSimpleReceiver {
         _approve(token, tokenTransferProxy);
 
         // Execute the ParaSwap swap
-        (bool ok, bytes memory ret) = paraSwapAugustus.call(swapData);
+        (bool ok, bytes memory ret) = veloraAugustus.call(swapData);
         if (!ok) {
             if (ret.length > 0) assembly { revert(add(32, ret), mload(ret)) }
             revert SwapFailed();

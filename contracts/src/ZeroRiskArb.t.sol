@@ -9,7 +9,7 @@ import "./interfaces/IERC20.sol";
 /// @notice Foundry test for the ZeroRiskArb flash loan arbitrage contract
 contract ZeroRiskArbTest is Test {
     ZeroRiskArb public arb;
-    address public constant PARA_SWAP_AUGUSTUS = address(0xDEF171Fe48CF0115B1d80b88dc8eAB59176FEe57);
+    address public constant VELORA_AUGUSTUS = address(0x6a000f20005980200259b80c5102003040001068);
 
     address public constant AAVE_POOL = address(0x87870Bca3F3fD6335C3F4ce8392D69350B4fA4E2);
     address public constant RADIANT_POOL = address(0xF4B1486DD74D77D2bFu3F8C8B3F6f4C1B4f9b4e6);
@@ -24,7 +24,7 @@ contract ZeroRiskArbTest is Test {
     function setUp() public {
         // Deploy contract
         vm.prank(address(this));
-        arb = new ZeroRiskArb(PARA_SWAP_AUGUSTUS);
+        arb = new ZeroRiskArb(VELORA_AUGUSTUS);
 
         // Set flash loan pools
         vm.prank(address(this));
@@ -42,7 +42,7 @@ contract ZeroRiskArbTest is Test {
     /// @notice Test deployment and initial state
     function test_Deployment() public {
         assertEq(arb.owner(), address(this));
-        assertEq(arb.paraSwapAugustus(), PARA_SWAP_AUGUSTUS);
+        assertEq(arb.veloraAugustus(), VELORA_AUGUSTUS);
         assertEq(arb.aaveV3Pool(), AAVE_POOL);
         assertEq(arb.radiantV2Pool(), RADIANT_POOL);
         assertEq(arb.sparkPool(), SPARK_POOL);
@@ -64,7 +64,7 @@ contract ZeroRiskArbTest is Test {
     /// @notice Test that execute reverts when pool not set
     function test_PoolNotSet() public {
         // Create new arb with no pools
-        ZeroRiskArb arbNoPools = new ZeroRiskArb(PARA_SWAP_AUGUSTUS);
+        ZeroRiskArb arbNoPools = new ZeroRiskArb(VELORA_AUGUSTUS);
 
         vm.expectRevert(ZeroRiskArb.PoolUnset.selector);
         arbNoPools.execute(0, DAI, 1000e18, 1e18, bytes(""), false);
@@ -109,10 +109,10 @@ contract ZeroRiskArbTest is Test {
     function test_Gas_Constructor() public {
         vm.pauseGasMetering();
         // warm-up
-        new ZeroRiskArb(PARA_SWAP_AUGUSTUS);
+        new ZeroRiskArb(VELORA_AUGUSTUS);
         vm.resumeGasMetering();
 
-        ZeroRiskArb newArb = new ZeroRiskArb(PARA_SWAP_AUGUSTUS);
+        ZeroRiskArb newArb = new ZeroRiskArb(VELORA_AUGUSTUS);
         uint256 gas = gasLeft();
         emit log_named_uint("Constructor gas used", gas);
     }

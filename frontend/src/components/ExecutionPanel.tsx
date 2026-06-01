@@ -233,7 +233,7 @@ export function ExecutionPanel({ opportunity, onClose }: Props) {
           <Arrow />
           <RouteNode label={opportunity.buy_dex} sub={`Buy on ${opportunity.buy_chain_name}`} color="green" />
           <Arrow />
-          <RouteNode label="ParaSwap V5" sub="Split Route" color="indigo" />
+          <RouteNode label="Velora" sub="Split Route API" color="indigo" />
           <Arrow />
           <RouteNode label={opportunity.sell_dex} sub={`Sell on ${opportunity.sell_chain_name}`} color="red" />
           <Arrow />
